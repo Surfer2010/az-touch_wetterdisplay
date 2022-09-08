@@ -27,6 +27,7 @@ See more at https://www.zihatec.de
  * Important: see settings.h to configure your settings!!!
  * ***************************/
 #include "settings.h"
+#include "html.h"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -44,6 +45,7 @@ See more at https://www.zihatec.de
  * - simpleDSTadjust by neptune2
  ***/
 
+
 #include <JsonListener.h>
 #include <OpenWeatherMapCurrent.h>
 #include <OpenWeatherMapForecast.h>
@@ -56,9 +58,6 @@ See more at https://www.zihatec.de
 #include "ArialRounded.h"
 #include "moonphases.h"
 #include "weathericons.h"
-
-
-
 
 #define MINI_BLACK 0
 #define MINI_WHITE 1
@@ -155,6 +154,9 @@ void connectWifi() {
   }
   drawProgress(100,"Connected to WiFi '" + String(WIFI_SSID) + "'");
   Serial.print("Connected...");
+  Serial.println();
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 }
 
 void setup() {
@@ -213,7 +215,58 @@ void setup() {
   canBtnPress = true;
 
    
-  // 
+    /***
+   *  
+   * This is for the webinterface
+   * 
+   ***/
+  // Send web page with input fields to client
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html", index_html);
+  });
+
+  // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
+  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    String inputMessage;
+    String inputParam;
+    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
+    if (request->hasParam(PARAM_INPUT_cityName)) {
+      inputMessage = request->getParam(PARAM_INPUT_cityName)->value();
+      inputParam = PARAM_INPUT_cityName;
+      DISPLAYED_CITY_NAME = inputMessage;
+      Serial.println("Stadt veraendert!");
+    }
+    // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
+    else if (request->hasParam(PARAM_INPUT_mapLocation)) {
+      inputMessage = request->getParam(PARAM_INPUT_mapLocation)->value();
+      inputParam = PARAM_INPUT_mapLocation;
+      OPEN_WEATHER_MAP_LOCATION_ID = inputMessage;
+      Serial.println("LocationID veraendert!");
+    }
+    // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
+    else if (request->hasParam(PARAM_INPUT_OWM_ID)) {
+      inputMessage = request->getParam(PARAM_INPUT_OWM_ID)->value();
+      inputParam = PARAM_INPUT_OWM_ID;
+      OPEN_WEATHER_MAP_APP_ID = inputMessage;
+      Serial.println("AppID veraendert!");
+    }
+    else {
+      inputMessage = "No message sent";
+      inputParam = "none";
+    }
+    Serial.println(inputMessage);
+    request->send(200, "text/html", "HTTP GET request sent to the weather display on input field (" 
+                                     + inputParam + ") with value: " + inputMessage +
+                                     "<br><a href=\"/\">Return to Main Page</a>");
+    Serial.print("City Name = "); Serial.println(DISPLAYED_CITY_NAME);
+    Serial.print("City ID = "); Serial.println(OPEN_WEATHER_MAP_LOCATION_ID);
+    Serial.print("App ID = "); Serial.println(OPEN_WEATHER_MAP_APP_ID);
+  });
+  
+  server.onNotFound(notFound);
+  server.begin();
+  // ----- End of webinterface setup -----
+  // -------------------------------------
 }
 
 long lastDrew = 0;
